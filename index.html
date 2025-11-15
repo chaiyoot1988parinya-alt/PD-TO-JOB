@@ -1,21 +1,41 @@
-<label>เลขที่จ๊อบ</label>
-<input id="jobNo">
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <title>สแกนเลขที่จ๊อบ</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body>
+  <h2>ระบบรายงานการผลิต</h2>
 
-<label>รหัสงาน</label>
-<input id="jobCode" readonly>
+  <button id="scanJobBtn">📷 กดสแกนเลขที่จ๊อบ</button>
+  <div id="qr-reader" style="width:300px;"></div>
 
-<label>จำนวนที่ต้องผลิต</label>
-<input id="planQty" readonly>
-
-<label>ขั้นตอนการทำงาน (WC)</label>
-<select id="wc"></select>
-
-<label>Oper</label>
-<input id="oper" readonly>
+  <div>
+    <label>เลขที่จ๊อบ</label>
+    <input id="jobNo" readonly>
+  </div>
+  <div>
+    <label>รหัสงาน</label>
+    <input id="jobCode" readonly>
+  </div>
+  <div>
+    <label>จำนวนที่ต้องผลิต</label>
+    <input id="planQty" readonly>
+  </div>
+  <div>
+    <label>ขั้นตอนการทำงาน (WC)</label>
+    <select id="wc"></select>
+  </div>
+  <div>
+    <label>Oper</label>
+    <input id="oper" readonly>
+  </div>
 
 <script>
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbwmbRX1bSEJjSisKhYI0lsJULE6Mzt8zjkSb3gZvrIzHrcaTJNydIWH8e-_N0V0FUktCA/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxpNDKIzJy5aTFf31syeKzYvxB8tgEFzzuLXcNUgp1cGLT93fO1KHDh9RqgsS77w-zKPg/exec'; // ใส่ลิงก์ Web App ของคุณ
 
+// ฟังก์ชันเรียกข้อมูลจาก GAS
 async function fetchJobInfo(jobNo) {
   const res = await fetch(GAS_URL, {
     method: "POST",
@@ -45,4 +65,22 @@ async function fetchJobInfo(jobNo) {
     document.getElementById("oper").value = data.wcOperMap[selectedWC] || "";
   };
 }
+
+// ปุ่มสแกน QR
+document.getElementById("scanJobBtn").addEventListener("click", () => {
+  const qr = new Html5Qrcode("qr-reader");
+  qr.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: 250 },
+    (decodedText) => {
+      qr.stop();
+      const jobNo = decodedText.split("||")[0].trim(); // ใช้ค่าแรกจาก QR
+      document.getElementById("jobNo").value = jobNo;
+      fetchJobInfo(jobNo); // ดึงข้อมูลจาก GAS
+    },
+    (errorMessage) => { console.log(errorMessage); }
+  ).catch(err => alert("เปิดกล้องไม่ได้: " + err));
+});
 </script>
+</body>
+</html>
