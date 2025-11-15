@@ -8,8 +8,9 @@
 <body>
   <h2>ระบบรายงานการผลิต</h2>
 
+  <!-- ปุ่มสแกนจ๊อบ -->
   <button id="scanJobBtn">📷 กดสแกนเลขที่จ๊อบ</button>
-  <div id="qr-reader" style="width:300px;"></div>
+  <div id="qr-reader-job" style="width:300px;"></div>
 
   <div>
     <label>เลขที่จ๊อบ</label>
@@ -32,8 +33,17 @@
     <input id="oper" readonly>
   </div>
 
+  <!-- ปุ่มสแกนเครื่องจักร -->
+  <button id="scanMachineBtn">📷 กดสแกนเลขที่เครื่องจักร</button>
+  <div id="qr-reader-machine" style="width:300px;"></div>
+
+  <div>
+    <label>เลขที่เครื่องจักร</label>
+    <input id="machineNo" readonly>
+  </div>
+
 <script>
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbxpNDKIzJy5aTFf31syeKzYvxB8tgEFzzuLXcNUgp1cGLT93fO1KHDh9RqgsS77w-zKPg/exec'; // ใส่ลิงก์ Web App ของคุณ
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxpNDKIzJy5aTFf31syeKzYvxB8tgEFzzuLXcNUgp1cGLT93fO1KHDh9RqgsS77w-zKPg/exec';
 
 // ฟังก์ชันเรียกข้อมูลจาก GAS
 async function fetchJobInfo(jobNo) {
@@ -66,17 +76,32 @@ async function fetchJobInfo(jobNo) {
   };
 }
 
-// ปุ่มสแกน QR
+// ปุ่มสแกน QR จ๊อบ
 document.getElementById("scanJobBtn").addEventListener("click", () => {
-  const qr = new Html5Qrcode("qr-reader");
-  qr.start(
+  const qrJob = new Html5Qrcode("qr-reader-job");
+  qrJob.start(
     { facingMode: "environment" },
     { fps: 10, qrbox: 250 },
     (decodedText) => {
-      qr.stop();
-      const jobNo = decodedText.split("||")[0].trim(); // ใช้ค่าแรกจาก QR
+      qrJob.stop();
+      const jobNo = decodedText.split("||")[0].trim();
       document.getElementById("jobNo").value = jobNo;
-      fetchJobInfo(jobNo); // ดึงข้อมูลจาก GAS
+      fetchJobInfo(jobNo);
+    },
+    (errorMessage) => { console.log(errorMessage); }
+  ).catch(err => alert("เปิดกล้องไม่ได้: " + err));
+});
+
+// ปุ่มสแกน QR เครื่องจักร
+document.getElementById("scanMachineBtn").addEventListener("click", () => {
+  const qrMachine = new Html5Qrcode("qr-reader-machine");
+  qrMachine.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: 250 },
+    (decodedText) => {
+      qrMachine.stop();
+      const machineNo = decodedText.trim(); // ใช้ค่าจาก QR ตรง ๆ
+      document.getElementById("machineNo").value = machineNo;
     },
     (errorMessage) => { console.log(errorMessage); }
   ).catch(err => alert("เปิดกล้องไม่ได้: " + err));
