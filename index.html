@@ -79,6 +79,9 @@
     <input id="machineNo" readonly>
   </div>
 
+  <!-- ปุ่มบันทึกข้อมูล -->
+  <button id="saveBtn">💾 บันทึกข้อมูล</button>
+
 <script>
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbxscq4-Pwuf3eITM_tK4eDuckZ7_R8Q5iU9uQdAaYM5J7OmSHNH58yYaz83kkMgpw3SfA/exec';
 
@@ -142,6 +145,35 @@ document.getElementById("scanMachineBtn").addEventListener("click", () => {
     },
     (errorMessage) => { console.log(errorMessage); }
   ).catch(err => alert("เปิดกล้องไม่ได้: " + err));
+});
+
+// ปุ่มบันทึกข้อมูล
+document.getElementById("saveBtn").addEventListener("click", async () => {
+  const jobNo = document.getElementById("jobNo").value.trim();
+  const planQty = document.getElementById("planQty").value.trim();
+  const wc = document.getElementById("wc").value.trim();
+  const oper = document.getElementById("oper").value.trim();
+  const machineNo = document.getElementById("machineNo").value.trim();
+
+  if (!jobNo || !planQty || !wc || !oper || !machineNo) {
+    alert("กรุณากรอกข้อมูลให้ครบก่อนบันทึก");
+    return;
+  }
+
+  const res = await fetch(GAS_URL, {
+    method: "POST",
+    body: new URLSearchParams({
+      action: "saveToRP",
+      jobNo,
+      planQty,
+      wc,
+      oper,
+      machineNo
+    })
+  });
+
+  const data = await res.json();
+  alert(data.msg);
 });
 </script>
 </body>
