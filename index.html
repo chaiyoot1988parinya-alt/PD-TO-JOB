@@ -88,7 +88,7 @@ async function fetchJobInfo(jobNo) {
     body: new URLSearchParams({ action:"jobInfo", jobNo })
   });
   const data = await res.json();
-
+  console.log(data);
   if (!data.ok) {
     alert(data.msg);
     return;
