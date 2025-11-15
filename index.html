@@ -4,40 +4,76 @@
   <meta charset="utf-8">
   <title>สแกนเลขที่จ๊อบ</title>
   <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 10px;
+      padding: 0;
+    }
+    h2 {
+      text-align: center;
+    }
+    button {
+      display: block;
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0;
+      font-size: 16px;
+    }
+    .qr-box {
+      width: 100%;
+      max-width: 320px;
+      margin: auto;
+    }
+    .form-group {
+      margin: 10px 0;
+    }
+    label {
+      display: block;
+      margin-bottom: 4px;
+      font-weight: bold;
+    }
+    input, select {
+      width: 100%;
+      padding: 8px;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+  </style>
 </head>
 <body>
   <h2>ระบบรายงานการผลิต</h2>
 
   <!-- ปุ่มสแกนจ๊อบ -->
   <button id="scanJobBtn">📷 กดสแกนเลขที่จ๊อบ</button>
-  <div id="qr-reader-job" style="width:300px;"></div>
+  <div id="qr-reader-job" class="qr-box"></div>
 
-  <div>
+  <div class="form-group">
     <label>เลขที่จ๊อบ</label>
     <input id="jobNo" readonly>
   </div>
-  <div>
+  <div class="form-group">
     <label>รหัสงาน</label>
     <input id="jobCode" readonly>
   </div>
-  <div>
+  <div class="form-group">
     <label>จำนวนที่ต้องผลิต</label>
     <input id="planQty" readonly>
   </div>
-  <div>
+  <div class="form-group">
     <label>ขั้นตอนการทำงาน (WC)</label>
     <select id="wc"></select>
   </div>
-  <div>
+  <div class="form-group">
     <label>Oper</label>
     <input id="oper" readonly>
   </div>
 
   <!-- ปุ่มสแกนเครื่องจักร -->
   <button id="scanMachineBtn">📷 กดสแกนเลขที่เครื่องจักร</button>
-  <div id="qr-reader-machine" style="width:300px;"></div>
+  <div id="qr-reader-machine" class="qr-box"></div>
 
-  <div>
+  <div class="form-group">
     <label>เลขที่เครื่องจักร</label>
     <input id="machineNo" readonly>
   </div>
@@ -81,7 +117,7 @@ document.getElementById("scanJobBtn").addEventListener("click", () => {
   const qrJob = new Html5Qrcode("qr-reader-job");
   qrJob.start(
     { facingMode: "environment" },
-    { fps: 10, qrbox: 250 },
+    { fps: 10, qrbox: { width: 250, height: 250 } },
     (decodedText) => {
       qrJob.stop();
       const jobNo = decodedText.split("||")[0].trim();
@@ -97,10 +133,10 @@ document.getElementById("scanMachineBtn").addEventListener("click", () => {
   const qrMachine = new Html5Qrcode("qr-reader-machine");
   qrMachine.start(
     { facingMode: "environment" },
-    { fps: 10, qrbox: 250 },
+    { fps: 10, qrbox: { width: 250, height: 250 } },
     (decodedText) => {
       qrMachine.stop();
-      const machineNo = decodedText.trim(); // ใช้ค่าจาก QR ตรง ๆ
+      const machineNo = decodedText.trim();
       document.getElementById("machineNo").value = machineNo;
     },
     (errorMessage) => { console.log(errorMessage); }
