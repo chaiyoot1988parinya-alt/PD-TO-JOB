@@ -1,225 +1,48 @@
-<!doctype html>
-<html lang="th">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ระบบรายงานการผลิต</title>
-  <script src="https://unpkg.com/html5-qrcode"></script>
-  <style>
-    body { margin:0; font-family: system-ui, "Noto Sans Thai", sans-serif; background:#f7f7f8; color:#111; }
-    header { padding:16px; border-bottom:1px solid #e5e7eb; background:#fff; }
-    main { padding:16px; max-width: 880px; margin:0 auto; }
-    .card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:16px; }
-    label { font-weight:600; display:block; margin-bottom:6px; }
-    input, select { width:100%; padding:10px; border:1px solid #e5e7eb; border-radius:10px; }
-    .row { display:grid; gap:12px; }
-    @media (min-width: 640px) { .row-2 { grid-template-columns: 1fr 1fr; } .row-3 { grid-template-columns: 1fr 1fr 1fr; } }
-    .muted { color:#6b7280; }
-    .out { background:#fafafa; border:1px dashed #e5e7eb; border-radius:12px; padding:12px; }
-    button { background:#0ea5e9; color:#fff; border:0; padding:10px 14px; border-radius:10px; font-weight:700; }
-    button[disabled] { opacity:.5; }
-    .err { color:#b91c1c; font-size:.9em; min-height:1em; }
-    .ok { color:#16a34a; font-size:.9em; }
-    .pill { display:inline-block; padding:4px 8px; border-radius:999px; background:#eef6ff; color:#0369a1; font-size:.9em; }
-  </style>
-</head>
-<body>
-  <header>
-    <h2 style="margin:0;">ระบบรายงานการผลิต</h2>
-    <p class="muted" style="margin:4px 0 0;">สแกน–ตรวจสอบ–เริ่มผลิต เชื่อม DPT และ RP อัตโนมัติ</p>
-  </header>
+<label>เลขที่จ๊อบ</label>
+<input id="jobNo">
 
-  <main>
-    <div class="card">
-      <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
-        <button id="scanQR">📷 สแกน JobN.</button>
-        <div id="qr-reader" style="width:300px;"></div>
-        <span class="muted">QR รูปแบบ: a||b||c||d จะดึงเฉพาะ a เป็น “เลขที่รอบ”</span>
-      </div>
+<label>รหัสงาน</label>
+<input id="jobCode" readonly>
 
-      <div class="row row-2">
-        <div>
-          <label>เลขที่รอบ</label>
-          <input id="round" readonly placeholder="เลขที่รอบที่ได้จากการสแกน">
-        </div>
-        <div>
-          <label>รหัสงาน</label>
-          <input id="jobCode" readonly placeholder="ดึงจาก DPT!C โดย match กับเลขที่รอบ">
-        </div>
-      </div>
+<label>จำนวนที่ต้องผลิต</label>
+<input id="planQty" readonly>
 
-      <div class="row row-3" style="margin-top:12px;">
-        <div>
-          <label>จำนวนที่ต้องผลิต</label>
-          <input id="need" readonly placeholder="DPT!G − RP!H รวม (ถ้าไม่มี RP ให้ใช้ DPT!G)">
-        </div>
-        <div>
-          <label>ขั้นตอนการทำงาน</label>
-          <select id="step">
-            <option value="">-- เลือกขั้นตอน --</option>
-            <!-- จะเติมอัตโนมัติจาก DPT!E ตามรหัสงาน -->
-          </select>
-        </div>
-        <div>
-          <label>Oper (อ้างอิงจากขั้นตอน)</label>
-          <input id="oper" readonly placeholder="แสดงค่าเดียวกับขั้นตอนที่เลือก">
-        </div>
-      </div>
+<label>ขั้นตอนการทำงาน (WC)</label>
+<select id="wc"></select>
 
-      <div class="row row-2" style="margin-top:12px;">
-        <div>
-          <label>เวลาที่เริ่มผลิต</label>
-          <input id="startedAt" readonly placeholder="ระบบจะใส่เวลาเมื่อกด เริ่มผลิต">
-        </div>
-        <div>
-          <label>เครื่องจักร</label>
-          <input id="machine" placeholder="ตั้งค่าเริ่มต้นเป็นเลขที่รอบ (แก้ไขได้)">
-        </div>
-      </div>
+<label>Oper</label>
+<input id="oper" readonly>
 
-      <div class="row" style="margin-top:12px;">
-        <div>
-          <label>ชื่อโมเดล (ถ้ามี)</label>
-          <input id="modelName" placeholder="ใส่ชื่อโมเดลหลังจากกด เริ่มผลิต หรือก่อนก็ได้">
-        </div>
-      </div>
+<script>
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwmbRX1bSEJjSisKhYI0lsJULE6Mzt8zjkSb3gZvrIzHrcaTJNydIWH8e-_N0V0FUktCA/exec';
 
-      <div class="out" style="margin-top:12px;">
-        <div class="muted">สถานะ:</div>
-        <div id="status"></div>
-      </div>
+async function fetchJobInfo(jobNo) {
+  const res = await fetch(GAS_URL, {
+    method: "POST",
+    body: new URLSearchParams({ action:"jobInfo", jobNo })
+  });
+  const data = await res.json();
 
-      <div style="margin-top:12px;">
-        <button id="startBtn" disabled>เริ่มผลิต</button>
-        <span id="submitStatus" class="muted" style="margin-left:12px;"></span>
-      </div>
-    </div>
-  </main>
+  if (!data.ok) {
+    alert(data.msg);
+    return;
+  }
 
-  <script>
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbxpNDKIzJy5aTFf31syeKzYvxB8tgEFzzuLXcNUgp1cGLT93fO1KHDh9RqgsS77w-zKPg/exec';
+  document.getElementById("jobCode").value = data.jobCode;
+  document.getElementById("planQty").value = data.planQty;
 
-    const els = {
-      round: document.getElementById('round'),
-      jobCode: document.getElementById('jobCode'),
-      need: document.getElementById('need'),
-      step: document.getElementById('step'),
-      oper: document.getElementById('oper'),
-      startedAt: document.getElementById('startedAt'),
-      machine: document.getElementById('machine'),
-      modelName: document.getElementById('modelName'),
-      status: document.getElementById('status'),
-      startBtn: document.getElementById('startBtn'),
-      submitStatus: document.getElementById('submitStatus'),
-      scanQRBtn: document.getElementById('scanQR'),
-      qrReaderDiv: document.getElementById('qr-reader')
-    };
+  const wcSelect = document.getElementById("wc");
+  wcSelect.innerHTML = "";
+  data.wcList.forEach(wc => {
+    const opt = document.createElement("option");
+    opt.value = wc;
+    opt.textContent = wc;
+    wcSelect.appendChild(opt);
+  });
 
-    // เปิดสแกน QR
-    els.scanQRBtn.addEventListener('click', () => {
-      els.qrReaderDiv.innerHTML = '';
-      const qr = new Html5Qrcode("qr-reader");
-      qr.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: 250 },
-        (decodedText) => {
-          qr.stop();
-          const round = decodedText.split('||')[0].trim();
-          els.round.value = round;
-          els.machine.value = round; // ตั้งค่าเครื่องจักรให้เท่ากับเลขที่รอบตามที่ต้องการ
-          els.status.innerHTML = `<span class="ok">สแกนสำเร็จ</span> <span class="pill">${round}</span>`;
-          // หลังสแกน ดึงข้อมูลจาก DPT/RP
-          if (round) {
-            loadRoundInfo(round);
-          }
-        },
-        () => {}
-      ).catch(err => {
-        els.status.innerHTML = `<span class="err">เปิดกล้องไม่ได้: ${err}</span>`;
-      });
-    });
-
-    function validateReady() {
-      const roundOk = !!els.round.value.trim();
-      const stepOk = !!els.step.value.trim();
-      const needOk = els.need.value.trim() !== '';
-      els.startBtn.disabled = !(roundOk && stepOk && needOk);
-    }
-
-    async function fetchJSON(url, payload) {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type':'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      return await res.json();
-    }
-
-    // ดึงข้อมูลรอบ: jobCode, needQty, steps (จาก DPT และ RP)
-    async function loadRoundInfo(round) {
-      els.status.textContent = 'กำลังดึงข้อมูลจาก DPT/RP...';
-      try {
-        const data = await fetchJSON(GAS_URL, { action:'roundInfo', round });
-        // คาดหวัง: { ok:true, jobCode:'...', planG:number, rpHsum:number, need:number, steps:['op1','op2',...] }
-        if (!data || !data.ok) throw new Error(data && data.msg ? data.msg : 'ไม่พบข้อมูล');
-
-        els.jobCode.value = data.jobCode || '';
-        els.need.value = typeof data.need === 'number' ? data.need : '';
-        // เติม dropdown ขั้นตอน
-        els.step.innerHTML = '<option value="">-- เลือกขั้นตอน --</option>' + (data.steps || []).map(s => `<option value="${s}">${s}</option>`).join('');
-
-        // แสดงสถานะ
-        const plan = typeof data.planG === 'number' ? data.planG : 0;
-        const rpHsum = typeof data.rpHsum === 'number' ? data.rpHsum : 0;
-        els.status.innerHTML = `<span class="ok">DPT!G=${plan}, RP!H(รวม)=${rpHsum}, ต้องผลิต=${data.need}</span>`;
-
-        validateReady();
-      } catch (err) {
-        els.status.innerHTML = `<span class="err">ดึงข้อมูลไม่สำเร็จ: ${err.message}</span>`;
-        els.jobCode.value = '';
-        els.need.value = '';
-        els.step.innerHTML = '<option value="">-- เลือกขั้นตอน --</option>';
-        validateReady();
-      }
-    }
-
-    // เมื่อเลือกขั้นตอน ให้เซ็ต Oper เท่าค่าที่เลือก
-    els.step.addEventListener('change', () => {
-      els.oper.value = els.step.value || '';
-      validateReady();
-    });
-
-    // เริ่มผลิต: บันทึก RP
-    els.startBtn.addEventListener('click', async () => {
-      validateReady();
-      if (els.startBtn.disabled) return;
-      const now = new Date().toISOString();
-      els.startedAt.value = now;
-      els.submitStatus.textContent = 'กำลังบันทึก...';
-
-      const payload = {
-        action: 'start',
-        round: els.round.value.trim(),
-        jobCode: els.jobCode.value.trim(),
-        oper: els.oper.value.trim(),     // ใช้ค่าเดียวกับขั้นตอนที่เลือก
-        stepName: els.step.value.trim(), // redundancy ถ้าต้องการ
-        machine: els.machine.value.trim(),
-        modelName: els.modelName.value.trim(),
-        startedAt: now
-      };
-
-      try {
-        const res = await fetchJSON(GAS_URL, payload);
-        if (res && res.ok) {
-          els.submitStatus.textContent = `บันทึกสำเร็จ (แถว ${res.rowIndex}${res.inserted ? ' - แทรกใหม่' : ''})`;
-        } else {
-          throw new Error(res && res.msg ? res.msg : 'ไม่สามารถบันทึกได้');
-        }
-      } catch (err) {
-        els.submitStatus.textContent = `บันทึกไม่สำเร็จ: ${err.message}`;
-      }
-    });
-  </script>
-</body>
-</html>
+  wcSelect.onchange = () => {
+    const selectedWC = wcSelect.value;
+    document.getElementById("oper").value = data.wcOperMap[selectedWC] || "";
+  };
+}
+</script>
