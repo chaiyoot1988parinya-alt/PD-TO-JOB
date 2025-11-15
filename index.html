@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>บันทึกเริ่มผลิต (PDT/RP)</title>
+  <style>
+    body { margin:0; font-family: system-ui, "Noto Sans Thai", sans-serif; background:#f7f7f8; color:#111; }
+    header { padding:16px; border-bottom:1px solid #e5e7eb; background:#fff; }
+    main { padding:16px; max-width: 860px; margin:0 auto; }
+    .card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:16px; }
+    label { font-weight:600; display:block; margin-bottom:6px; }
+    input, select { width:100%; padding:10px; border:1px solid #e5e7eb; border-radius:10px; }
+    .row { display:grid; gap:12px; }
+    @media (min-width: 640px) { .row-2 { grid-template-columns: 1fr 1fr; } .row-3 { grid-template-columns: 1fr 1fr 1fr; } }
+    .muted { color:#6b7280; }
+    .out { background:#fafafa; border:1px dashed #e5e7eb; border-radius:12px; padding:12px; }
+    button { background:#0ea5e9; color:#fff; border:0; padding:10px 14px; border-radius:10px; font-weight:700; }
+    button[disabled] { opacity:.5; }
+    .err { color:#b91c1c; font-size:.9em; min-height:1em; }
+    .ok { color:#16a34a; font-size:.9em; }
+  </style>
+</head>
+<body>
+  <header>
+    <h2 style="margin:0;">บันทึกเริ่มผลิต</h2>
+    <p class="muted" style="margin:4px 0 0;">ตรวจสอบกับ PDT และ RP อัตโนมัติ</p>
+  </header>
+
+  <main>
+    <div class="card">
+      <div class="row row-2">
+        <div>
+          <label>ผลสแกน (มีรูปแบบ a||b||c||d)</label>
+          <input id="scan" placeholder="เช่น 42512-1736||10||1MC068||52461-K1T -E100-P04">
+          <div id="scanErr" class="err"></div>
+        </div>
+        <div>
+          <label>เลขที่จ๊อบ (ตัดมาเฉพาะหน้าก่อน ||)</label>
+          <input id="job" readonly>
+        </div>
+      </div>
+
+      <div class="row row-2" style="margin-top:12px;">
+        <div>
+          <label>ขั้นตอนการทำงาน (ดรอปดาวน์)</label>
+          <select id="step">
+            <option value="">-- เลือกขั้นตอน --</option>
+            <!-- ใส่ตัวเลือกจริงของคุณที่นี่ -->
+            <option value="ขั้นตอน A">ขั้นตอน A</option>
+            <option value="ขั้นตอน B">ขั้นตอน B</option>
+            <option value="ขั้นตอน C">ขั้นตอน C</option>
+          </select>
+          <div id="stepErr" class="err"></div>
+        </div>
+        <div>
+          <label>เครื่องจักร</label>
+          <select id="machine">
+            <option value="">-- เลือกเครื่องจักร --</option>
+            <!-- ใส่ตัวเลือกจริงของคุณที่นี่ -->
+            <option value="MC-01">MC-01</option>
+            <option value="MC-02">MC-02</option>
+            <option value="MC-03">MC-03</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row row-3" style="margin-top:12px;">
+        <div>
+          <label>Oper (จาก PDT!E)</label>
+          <input id="oper" readonly>
+        </div>
+        <div>
+          <label>จำนวนจาก PDT!G</label>
+          <input id="pdtG" readonly>
+        </div>
+        <div>
+          <label>จำนวนที่ต้องผลิต</label>
+          <input id="need" readonly>
+        </div>
+      </div>
+
+      <div class="out" style="margin-top:12px;">
+        <div class="muted">สถานะการตรวจสอบ:</div>
+        <div id="status"></div>
+      </div>
+
+      <div style="margin-top:12px;">
+        <button id="startBtn" disabled>เริ่มผลิต</button>
+        <span id="submitStatus" class="muted" style="margin-left:12px;"></span>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // ตั้ง URL ของ Google Apps Script ของคุณ
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzgfr2UNQ_ITkVen1Rd4LJJFMXvQ_14-fnLs8H7dD2X090VPy4wgvFL4irVhh5Eyon_-w/exec';
+
+    const els = {
+      scan: document.getElementById('scan'),
+      scanErr: document.getElementById('scanErr'),
+      job: document.getElementById('job'),
+      step: document.getElementById('step'),
+      stepErr: document.getElementById('stepErr'),
+      machine: document.getElementById('machine'),
+      oper: document.getElementById('oper'),
+      pdtG: document.getElementById('pdtG'),
+      need: document.getElementById('need'),
+      status: document.getElementById('status'),
+      startBtn: document.getElementById('startBtn'),
+      submitStatus: document.getElementById('submitStatus'),
+    };
+
+    function parseJobFromScan(v) {
+      // รับรูปแบบ: job||... => เอาเฉพาะ job (ก่อน || แรก)
+      if (!v || !v.includes('||')) return { ok:false, msg:'รูปแบบไม่ถูกต้อง: ต้องมี || เพื่อแยกข้อมูล' };
+      const job = v.split('||')[0].trim();
+      if (!job) return { ok:false, msg:'ไม่พบเลขที่จ๊อบจากสตริงสแกน' };
+      return { ok:true, job };
+    }
+
+    async function fetchJSON(url, payload) {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return await res.json();
+    }
+
+    async function checkPDTandRP(jobNo, stepName) {
+      els.status.textContent = 'กำลังตรวจสอบ PDT และ RP...';
+      // ขอข้อมูลที่จำเป็นจาก Apps Script: pdtRow (match D & H), rpTotalForStep (รวม H ของ RP ที่ B & I ตรง)
+      const data = await fetchJSON(GAS_URL, {
+        action: 'check',
+        jobNo,
+        stepName
+      });
+      // data: { pdt: {E, G}, rp: {Hsum} } หรือระบุว่าไม่มี
+      const hasPDT = !!(data && data.pdt);
+      const hasRP = !!(data && data.rp && typeof data.rp.Hsum === 'number');
+
+      if (!hasPDT) {
+        els.status.innerHTML = '<span class="err">ไม่พบข้อมูลใน PDT ที่ D=เลขที่จ๊อบ และ H=ขั้นตอนนี้</span>';
+        els.oper.value = ''; els.pdtG.value = ''; els.need.value = '';
+        return { ok:false };
+      }
+
+      const oper = data.pdt.E || '';
+      const pdtG = Number(data.pdt.G || 0);
+      const rpHsum = hasRP ? Number(data.rp.Hsum) : 0;
+      const need = Math.max(pdtG - rpHsum, 0);
+
+      els.oper.value = oper;
+      els.pdtG.value = pdtG;
+      els.need.value = hasRP ? need : pdtG;
+
+      els.status.innerHTML = hasRP
+        ? `<span class="ok">พบ PDT และ RP: จำนวน RP (H รวม) = ${rpHsum}, ต้องผลิต = ${need}</span>`
+        : `<span class="ok">พบ PDT, ไม่พบ RP สำหรับขั้นตอนนี้: ต้องผลิต = ${pdtG}</span>`;
+
+      return { ok:true, oper, pdtG, need };
+    }
+
+    function validateReady() {
+      const jobOk = !!els.job.value.trim();
+      const stepOk = !!els.step.value.trim();
+      const needOk = els.need.value.trim() !== '';
+      els.startBtn.disabled = !(jobOk && stepOk && needOk);
+    }
+
+    els.scan.addEventListener('input', () => {
+      const r = parseJobFromScan(els.scan.value);
+      if (!r.ok) {
+        els.scanErr.textContent = r.msg;
+        els.job.value = '';
+      } else {
+        els.scanErr.textContent = '';
+        els.job.value = r.job;
+      }
+      validateReady();
+    });
+
+    els.step.addEventListener('change', async () => {
+      els.stepErr.textContent = '';
+      if (!els.job.value.trim() || !els.step.value.trim()) {
+        els.status.textContent = '';
+        els.oper.value=''; els.pdtG.value=''; els.need.value='';
+        validateReady();
+        return;
+      }
+      try {
+        const r = await checkPDTandRP(els.job.value.trim(), els.step.value.trim());
+        if (!r.ok) {
+          els.stepErr.textContent = 'ตรวจสอบไม่ผ่าน: กรุณาเลือกขั้นตอนอื่นหรือเช็คชีท PDT';
+        }
+      } catch (err) {
+        els.status.innerHTML = `<span class="err">ผิดพลาดระหว่างตรวจสอบ: ${err.message}</span>`;
+      }
+      validateReady();
+    });
+
+    els.startBtn.addEventListener('click', async () => {
+      validateReady();
+      if (els.startBtn.disabled) return;
+      els.submitStatus.textContent = 'กำลังบันทึก...';
+
+      const payload = {
+        action: 'start',
+        jobNo: els.job.value.trim(),
+        oper: els.oper.value.trim(),        // จาก PDT!E
+        stepName: els.step.value.trim(),    // จะไป RP!I
+        machine: els.machine.value.trim(),  // จะไป RP!J
+        startedAt: new Date().toISOString()
+      };
+
+      try {
+        const res = await fetchJSON(GAS_URL, payload);
+        // res: { ok:true, rowIndex:number, inserted:boolean }
+        if (res && res.ok) {
+          els.submitStatus.textContent = `บันทึกสำเร็จ (แถว ${res.rowIndex}${res.inserted ? ' - แทรกใหม่' : ''})`;
+        } else {
+          throw new Error(res && res.msg ? res.msg : 'ไม่สามารถบันทึกได้');
+        }
+      } catch (err) {
+        els.submitStatus.textContent = `บันทึกไม่สำเร็จ: ${err.message}`;
+      }
+    });
+  </script>
+</body>
+</html>
